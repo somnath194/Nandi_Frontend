@@ -3,11 +3,14 @@ import ChatWindow from './components/ChatWindow.jsx'
 import Composer from './components/Composer.jsx'
 import Toolbar from './components/Toolbar.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
+import VideoWindow from './components/VideoWindow.jsx'   // 👈 import added
 import { speak, listVoices, supportsRecognition, startRecognition, stopRecognition } from './lib/speech.js'
-import { chat as callAI } from './lib/aiAdapter.js'
+import { chat as callAI } from './lib/aiAdapter1.js'
+import { uuid } from './lib/utils.js'
+
 
 const initialBotMsg = {
-  id: crypto.randomUUID(),
+  id: uuid(),
   role: 'bot',
   text: 'Hey! I\'m your voice-enabled chat. Type, talk, or drop files — I\'ll respond and read replies out loud if you like.',
   ts: Date.now()
@@ -70,24 +73,98 @@ export default function App(){
     return () => stopRecognition()
   }, [listening])
 
-  const handleSend = async (text, attachments=[]) => {
-    if(!text && attachments.length === 0) return
-    const userMsg = { id: crypto.randomUUID(), role: 'user', text, ts: Date.now(), attachments }
-    setMessages(prev => [...prev, userMsg, { id: 'typing', role: 'bot', text: '…', typing: true, ts: Date.now() }])
+  const handleSend = async (text, attachments = []) => {
+  if (!text && attachments.length === 0) return
+  const userMsg = { id: uuid(), role: "user", text, ts: Date.now(), attachments }
+  setMessages(prev => [...prev, userMsg])
 
-    try{
-      const responseText = await callAI([...messages, userMsg], attachments)
-      if(streamTyping){
-        await streamIn(responseText)
-      }else{
-        setMessages(prev => prev.filter(m => m.id !== 'typing').concat({ id: crypto.randomUUID(), role: 'bot', text: responseText, ts: Date.now() }))
+  // show typing placeholder immediately
+  // const typingId = uuid()
+  // setMessages(prev => [
+  //   ...prev,
+  //   { id: typingId, role: "bot", text: "...", ts: Date.now(), typing: true }
+  // ])
+
+  try {
+    await callAI(
+      [...messages, userMsg],
+      attachments,
+      async (data) => {
+        if (data.conversation_output) {
+          if (streamTyping) {
+            // Typing effect for each bot message
+            const tokens = data.conversation_output.split(/(\s+)/)
+            let acc = ""
+            const msgId = uuid()
+
+            setMessages(prev =>
+              prev.concat({
+                id: msgId,
+                role: "bot",
+                text: "",
+                typing: true,
+                ts: Date.now(),
+              })
+            )
+
+            for (const t of tokens) {
+              acc += t
+              await new Promise(r => setTimeout(r, Math.min(40 + Math.random() * 60, 120)))
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === msgId ? { ...m, text: acc } : m
+                )
+              )
+            }
+
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === msgId ? { ...m, typing: false, ts: Date.now() } : m
+              )
+            )
+
+            if (autoSpeak) {
+              speak(data.conversation_output, {
+                voiceName,
+                rate: speechRate,
+                pitch: speechPitch,
+              })
+            }
+          } else {
+            // Direct full message (no typing effect)
+            setMessages(prev =>
+              prev.concat({
+                id: uuid(),
+                role: "bot",
+                text: data.conversation_output,
+                ts: Date.now(),
+              })
+            )
+            if (autoSpeak) {
+              speak(data.conversation_output, {
+                voiceName,
+                rate: speechRate,
+                pitch: speechPitch,
+              })
+            }
+          }
+        }
       }
-      if(autoSpeak && responseText) speak(responseText, { voiceName, rate: speechRate, pitch: speechPitch })
-    }catch(e){
-      console.error(e)
-      setMessages(prev => prev.filter(m => m.id !== 'typing').concat({ id: crypto.randomUUID(), role: 'bot', text: 'Oops, something went wrong.', ts: Date.now() }))
-    }
+    )
+  } catch (e) {
+    console.error(e)
+    setMessages(prev =>
+      prev.concat({
+        id: uuid(),
+        role: "bot",
+        text: "Oops, something went wrong.",
+        ts: Date.now(),
+      })
+    )
   }
+}
+
+
 
   async function streamIn(full){
     const tokens = full.split(/(\s+)/)
@@ -97,7 +174,7 @@ export default function App(){
       await new Promise(r => setTimeout(r, Math.min(40 + Math.random()*60, 120)))
       setMessages(prev => prev.map(m => m.id === 'typing' ? { ...m, text: acc } : m))
     }
-    setMessages(prev => prev.map(m => m.id === 'typing' ? { ...m, id: crypto.randomUUID(), typing: false, text: acc, ts: Date.now() } : m))
+    setMessages(prev => prev.map(m => m.id === 'typing' ? { ...m, id: uuid(), typing: false, text: acc, ts: Date.now() } : m))
   }
 
   function clearChat(){
@@ -120,31 +197,29 @@ export default function App(){
     const onKey = (e) => {
       if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); focusInput() }
       if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l'){ e.preventDefault(); clearChat() }
-      if(e.key.toLowerCase() === 'm' && !e.metaKey && !e.ctrlKey){ e.preventDefault(); toggleListening() }
+      if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm'){ e.preventDefault(); toggleListening() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  return (
-    <div className="app-wrap">
+ return (
+  <div className="app-wrap" style={{ display: "flex",justifyContent: "space-between", height: "100vh",width: "100vw", padding: "10px",boxSizing: "border-box"}}>
+    
+    {/* Left Chat Column */}
+    <div style={{ flex: "0 0 65%", display: "flex", flexDirection: "column", marginRight: "10px" }}>
       <Toolbar
         listening={listening}
         onToggleListening={toggleListening}
         onClear={clearChat}
         onOpenSettings={() => setShowSettings(s => !s)}
       />
-      <div className="content">
-        {messages.length === 0 ? (
-          <div className="empty">Start chatting…</div>
-        ) : (
-          <ChatWindow messages={messages} />
-        )}
+      <div className="content" style={{ flex: 1, overflow: "auto" }}>
+        {messages.length === 0
+          ? <div className="empty">Start chatting…</div>
+          : <ChatWindow messages={messages} />}
       </div>
-      <Composer
-        onSend={handleSend}
-        inputRef={inputRef}
-      />
+      <Composer onSend={handleSend} inputRef={inputRef} />
       {showSettings && (
         <SettingsPanel
           onClose={() => setShowSettings(false)}
@@ -157,5 +232,26 @@ export default function App(){
         />
       )}
     </div>
-  )
+
+    {/* Right Sidebar (Video + Log) */}
+    <div style={{ flex: "0 0 35%", display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+      <VideoWindow />
+
+      <div
+        style={{
+          marginTop: "10px",
+          width: "320px",
+          height: "150px",
+          border: "2px solid #333",
+          borderRadius: "8px",
+          backgroundColor: "#111",
+          color: "#0f0",
+          padding: "10px",
+          overflowY: "auto"
+        }}
+      >
+      </div>
+    </div>
+  </div>
+)
 }
