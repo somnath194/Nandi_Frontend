@@ -5,7 +5,7 @@ const VideoStream = () => {
   const [defaultImg] = useState("/video_logo.png") // 👈 put your logo file in `public/logo.png`
 
   useEffect(() => {
-    const ws = new WebSocket("wss://192.168.1.10:8000/ws/video")
+    const ws = new WebSocket("wss://api.shuun.site/ws/video")
 
     ws.onmessage = (event) => {
       try {

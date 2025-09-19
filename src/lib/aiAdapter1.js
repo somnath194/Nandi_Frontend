@@ -1,4 +1,4 @@
-const WS_URL = "wss://192.168.1.10:8000/ws/chat"
+const WS_URL = "wss://api.shuun.site/ws/chat"
 
 let ws = null
 let isConnected = false
