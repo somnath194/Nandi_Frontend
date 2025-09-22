@@ -1,4 +1,4 @@
-const WS_URL = "wss://api.shuun.site/ws/chat"
+const WS_URL = "wss://api.shuun.site/ws/chat?pin=071999"
 
 let ws = null
 let isConnected = false
