@@ -1,4 +1,4 @@
-const WS_URL = "wss://api.shuun.site/ws/chat?pin=071999"
+const WS_URL = "wss://api.shuun.site/ws/chat"
 
 let ws = null
 let isConnected = false
@@ -31,15 +31,24 @@ export async function chat(history, attachments, onMessage) {
           console.log("📩 Raw WS message:", event.data)
           const data = JSON.parse(event.data)
 
+          // 🔹 Extract response text from new format (response field instead of conversation_output)
+          const responseText = data.response || data.conversation_output
+          
+          // 🔹 Create normalized data object for UI with response_text property
+          const normalizedData = {
+            ...data,
+            response_text: responseText
+          }
+
           // 🔹 Always forward every message to UI
           if (globalOnMessage) {
-            globalOnMessage(data)
+            globalOnMessage(normalizedData)
           }
 
           // 🔹 Resolve only the *first* response for this chat call
-          if (data.conversation_output && requestResolvers.length > 0) {
+          if (responseText && requestResolvers.length > 0) {
             const resolver = requestResolvers.shift()
-            resolver(data.conversation_output)
+            resolver(responseText)
           }
         }
 

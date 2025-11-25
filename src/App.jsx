@@ -4,6 +4,7 @@ import Composer from './components/Composer.jsx'
 import Toolbar from './components/Toolbar.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import VideoWindow from './components/VideoWindow.jsx'   // 👈 import added
+import LogPanel from './components/LogPanel.jsx'   // 👈 log panel import
 import { speak, listVoices, supportsRecognition, startRecognition, stopRecognition } from './lib/speech.js'
 import { chat as callAI } from './lib/aiAdapter1.js'
 import { uuid } from './lib/utils.js'
@@ -90,10 +91,10 @@ export default function App(){
       [...messages, userMsg],
       attachments,
       async (data) => {
-        if (data.conversation_output) {
+        if (data.response_text) {
           if (streamTyping) {
             // Typing effect for each bot message
-            const tokens = data.conversation_output.split(/(\s+)/)
+            const tokens = data.response_text.split(/(\s+)/)
             let acc = ""
             const msgId = uuid()
 
@@ -124,7 +125,7 @@ export default function App(){
             )
 
             if (autoSpeak) {
-              speak(data.conversation_output, {
+              speak(data.response_text, {
                 voiceName,
                 rate: speechRate,
                 pitch: speechPitch,
@@ -136,12 +137,12 @@ export default function App(){
               prev.concat({
                 id: uuid(),
                 role: "bot",
-                text: data.conversation_output,
+                text: data.response_text,
                 ts: Date.now(),
               })
             )
             if (autoSpeak) {
-              speak(data.conversation_output, {
+              speak(data.response_text, {
                 voiceName,
                 rate: speechRate,
                 pitch: speechPitch,
@@ -204,10 +205,10 @@ export default function App(){
   }, [])
 
  return (
-  <div className="app-wrap" style={{ display: "flex",justifyContent: "space-between", height: "100vh",width: "100vw", padding: "10px",boxSizing: "border-box"}}>
+  <div className="app-wrap" style={{ display: "flex", justifyContent: "space-between", height: "100vh", width: "100vw", padding: "10px", boxSizing: "border-box", overflow: "hidden" }}>
     
     {/* Left Chat Column */}
-    <div style={{ flex: "0 0 65%", display: "flex", flexDirection: "column", marginRight: "10px" }}>
+    <div style={{ flex: "0 0 65%", display: "flex", flexDirection: "column", marginRight: "10px", minHeight: 0 }}>
       <Toolbar
         listening={listening}
         onToggleListening={toggleListening}
@@ -234,23 +235,9 @@ export default function App(){
     </div>
 
     {/* Right Sidebar (Video + Log) */}
-    <div style={{ flex: "0 0 35%", display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+    <div style={{ flex: "0 0 35%", display: "flex", flexDirection: "column", alignItems: "flex-end", minHeight: 0, overflow: "hidden" }}>
       <VideoWindow />
-
-      <div
-        style={{
-          marginTop: "10px",
-          width: "320px",
-          height: "150px",
-          border: "2px solid #333",
-          borderRadius: "8px",
-          backgroundColor: "#111",
-          color: "#0f0",
-          padding: "10px",
-          overflowY: "auto"
-        }}
-      >
-      </div>
+      <LogPanel />
     </div>
   </div>
 )

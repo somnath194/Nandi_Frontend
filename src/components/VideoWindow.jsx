@@ -5,7 +5,7 @@ const VideoStream = () => {
   const [defaultImg] = useState("/video_logo.png") // 👈 put your logo file in `public/logo.png`
 
   useEffect(() => {
-    const ws = new WebSocket("wss://api.shuun.site/ws/video?pin=071999")
+    const ws = new WebSocket("wss://api.shuun.site/ws/video")
 
     ws.onmessage = (event) => {
       try {
@@ -39,14 +39,15 @@ const VideoStream = () => {
     border: "2px solid #333",
     borderRadius: "12px",
     overflow: "hidden",
-    width: "600px",   // ⬅️ wider
-    height: "350px",  // ⬅️ taller
+    width: "600px",
+    height: "350px",
     backgroundColor: "black",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: "16px", // ⬅️ gap before action log
-    marginRight: "16px",  // ⬅️ align to right edge
+    marginBottom: "16px",
+    marginRight: "16px",
+    flexShrink: 0,
   }}
     >
       <img
