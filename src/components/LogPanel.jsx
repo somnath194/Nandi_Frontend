@@ -7,7 +7,7 @@ const LogPanel = () => {
   const wsRef = useRef(null)
 
   useEffect(() => {
-    const LOG_SERVER_URL = "ws://api.shuun.site/ws/logs" // Change if deployed remotely
+    const LOG_SERVER_URL = "wss://api.shuun.site/ws/logs" // Change if deployed remotely
     // const LOG_SERVER_URL = "ws://127.0.0.1:8001/ws/logs" // Local fallback
 
     console.log(`📡 Connecting to log server at ${LOG_SERVER_URL}...`)
