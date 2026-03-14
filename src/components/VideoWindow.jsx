@@ -34,31 +34,12 @@ const VideoStream = () => {
   }, [])
 
   return (
-    <div
-      style={{
-    border: "2px solid #333",
-    borderRadius: "12px",
-    overflow: "hidden",
-    width: "600px",
-    height: "350px",
-    backgroundColor: "black",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: "16px",
-    marginRight: "16px",
-    flexShrink: 0,
-  }}
-    >
+    <div className="video-box">
       <img
         ref={imgRef}
         src={defaultImg}  // 👈 show default logo until a frame arrives
         alt="Live Video"
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain", // contain to keep logo aspect ratio
-        }}
+        className="video-frame"
       />
     </div>
   )

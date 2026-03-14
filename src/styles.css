@@ -38,6 +38,23 @@ a:hover { text-decoration: underline; }
   gap: 16px;
   box-sizing: border-box;                      /* spacing between left & right columns */
 }
+/* ensure app fills viewport but allows stacking on small screens */
+.app-wrap{ min-height:100vh }
+
+.left-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* allow shrinking */
+}
+
+.right-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch; /* allow children to fill column width */
+  width: 400px; /* fixed width for right column */
+  flex-shrink: 0;
+}
 
 
 .toolbar{
@@ -50,6 +67,7 @@ a:hover { text-decoration: underline; }
   padding: 12px 14px;
   backdrop-filter: blur(12px);
   box-shadow: 0 10px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.03);
+  flex-wrap: wrap;
 }
 
 .brand{
@@ -58,18 +76,24 @@ a:hover { text-decoration: underline; }
   gap: 10px;
   padding-right: 8px;
   border-right: 1px solid rgba(148,163,184,.15);
+  min-width: 0;
+  flex-shrink: 1;
 }
 .brand-icon{
   width: 28px; height: 28px;
+  flex-shrink: 0;
 }
 .brand h1{
   font-size: 16px;
   font-weight: 700;
   margin: 0;
   letter-spacing: .2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.toolbar .spacer{ flex: 1 }
+.toolbar .spacer{ flex: 1; min-width: 10px; }
 
 .icon-btn{
   display: inline-flex;
@@ -82,11 +106,14 @@ a:hover { text-decoration: underline; }
   border-radius: 12px;
   cursor: pointer;
   transition: all .15s ease;
+  white-space: nowrap;
+  min-height: 36px;
+  box-sizing: border-box;
 }
 .icon-btn:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.25); }
 .icon-btn:active{ transform: translateY(0); }
 .icon-btn.active{ outline: var(--ring); border-color: rgba(34,211,238,.35); }
-.icon-btn .dot{ width: 8px; height: 8px; border-radius: 999px; background: var(--muted); }
+.icon-btn .dot{ width: 8px; height: 8px; border-radius: 999px; background: var(--muted); flex-shrink: 0; }
 .icon-btn .dot.on{ background: var(--success); box-shadow: 0 0 0 3px rgba(16,185,129,.25); }
 
 .content {
@@ -117,6 +144,8 @@ a:hover { text-decoration: underline; }
   gap: 10px;
   max-width: 85%;
   animation: slideIn .18s ease;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 @keyframes slideIn {
@@ -190,6 +219,23 @@ a:hover { text-decoration: underline; }
   padding: 10px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
 }
+
+/* Make composer adapt on narrow screens: stack input and send button */
+@media (max-width: 900px) {
+  .composer{
+    display: flex;
+    flex-direction: column-reverse; /* keep send button visible at bottom */
+    gap: 8px;
+    padding: 8px;
+  }
+  .composer .input-wrap{ width: 100%; }
+  .composer .send-btn{ width: 100%; align-self: stretch; }
+}
+
+/* Ensure the right column can shrink on small widths and the video/log don't overflow */
+.right-column{ min-width: 0; }
+.video-box{ max-width: 100%; }
+
 
 .input-wrap{
   display: grid;
@@ -272,22 +318,177 @@ textarea.input{
   color: var(--muted);
 }
 
+/* Allow chat container to be focused without ugly outlines */
+.chat:focus{
+  outline: none;
+}
+
 .right-column {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  padding-right: 20px;   /* ⬅️ spacing from right edge */
-  padding-bottom: 20px;  /* ⬅️ spacing from bottom */
-  gap: 16px;             /* ⬅️ space between video & log */
+  align-items: stretch; /* allow children to fill column width */
+  padding-right: 20px;   /* spacing from right edge */
+  padding-bottom: 20px;  /* spacing from bottom */
+  gap: 16px;             /* space between video & log */
 }
 
 .action-log {
-  width: 400px;          /* ⬅️ match video width */
-  min-height: 220px;     /* ⬅️ taller log box */
+  width: 100%;
+  max-width: 100%;
+  min-height: 220px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(148, 163, 184, .25);
   border-radius: 12px;
   padding: 12px;
   color: var(--success); /* green text */
   overflow-y: auto;
+}
+
+.action-log{
+  display: flex;
+  flex-direction: column;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #0f0;
+  background: #0b0f13;
+  border: 2px solid rgba(0,0,0,0.4);
+  box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.06);
+  padding: 10px;
+}
+.action-log__header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap: 12px;
+  padding-bottom:8px;
+  margin-bottom:8px;
+  border-bottom: 1px solid rgba(0,255,0,0.08);
+  font-weight:600;
+}
+.action-log__clear{
+  background: rgba(0,255,0,0.06);
+  border: 1px solid rgba(0,255,0,0.12);
+  color: #0f0;
+  padding: 6px 10px;
+  border-radius:6px;
+  cursor:pointer;
+}
+.action-log__clear:hover{ background: rgba(0,255,0,0.12) }
+.action-log__body{ flex:1; overflow-y:auto; display:flex; flex-direction:column }
+.action-log__empty{ color: #666; font-style: italic; margin-top: 24px; text-align:center }
+.action-log__line{ margin-bottom:6px; word-break:break-word }
+.action-log__ts{ color:#888 }
+.action-log__msg{ color: #0f0 }
+
+/* Video box (responsive) */
+.video-box{
+  border: 2px solid #333;
+  border-radius: 12px;
+  overflow: hidden;
+  width: 100%;           /* fill the right column width */
+  background-color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  margin-right: 0;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 9; /* preserve 16:9 aspect */
+}
+.video-box .video-frame{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Responsive: stack columns on small screens, full-width sidebar and video/log */
+@media (max-width: 900px) {
+  .app-wrap{
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .left-column,
+  .right-column{
+    flex: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .right-column{
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .action-log{
+    width: 100%;
+    min-height: 140px;
+  }
+
+  .video-box{
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9;
+    margin-right: 0;
+  }
+
+  .video-box .video-frame{ object-fit: contain }
+
+  .toolbar{ flex-wrap: wrap; gap: 8px }
+
+  .content{ border-radius: 12px; padding: 10px }
+
+  .composer{ position: sticky; bottom: 8px; z-index: 40 }
+
+  .msg{ max-width: 100% }
+  .preview-img{ max-width: 100% }
+}
+
+/* Tablet: adjust right column width */
+@media (max-width: 1200px) and (min-width: 901px) {
+  .right-column {
+    width: 350px;
+  }
+}
+
+/* Large screens: increase right column */
+@media (min-width: 1400px) {
+  .right-column {
+    width: 450px;
+  }
+}
+
+/* Small phones: reduce paddings and toolbar density */
+@media (max-width: 420px){
+  .app-wrap{ padding: 8px }
+  .toolbar{ padding: 8px; gap: 6px; font-size: 14px; }
+  .brand h1{ font-size: 14px }
+  .icon-btn{ padding: 6px 8px; min-height: 44px; font-size: 14px; }
+  .send-btn{ padding: 10px 12px; min-height: 44px; font-size: 14px; }
+  .content{ padding: 8px }
+  .composer{ padding: 8px }
+  .msg .bubble{ padding: 10px 12px; font-size: 14px; }
+  .settings{ width: calc(100% - 16px); padding: 12px; }
+  .settings h3{ font-size: 16px; }
+  .settings label{ font-size: 13px; }
+  .action-log{ min-height: 120px; padding: 10px; }
+  .video-box{ aspect-ratio: 16 / 9; }
+}
+
+/* Extra small screens */
+@media (max-width: 320px){
+  .app-wrap{ padding: 4px }
+  .toolbar{ padding: 6px; gap: 4px; }
+  .brand h1{ font-size: 12px }
+  .icon-btn{ padding: 4px 6px; font-size: 12px; }
+  .send-btn{ padding: 8px 10px; font-size: 12px; }
+  .content{ padding: 6px }
+  .composer{ padding: 6px }
+  .msg .bubble{ padding: 8px 10px; font-size: 13px; }
+  .settings{ padding: 10px; }
+  .action-log{ padding: 8px; }
 }

@@ -205,10 +205,10 @@ export default function App(){
   }, [])
 
  return (
-  <div className="app-wrap" style={{ display: "flex", justifyContent: "space-between", height: "100vh", width: "100vw", padding: "10px", boxSizing: "border-box", overflow: "hidden" }}>
+  <div className="app-wrap">
     
     {/* Left Chat Column */}
-    <div style={{ flex: "0 0 65%", display: "flex", flexDirection: "column", marginRight: "10px", minHeight: 0 }}>
+    <div className="left-column">
       <Toolbar
         listening={listening}
         onToggleListening={toggleListening}
@@ -235,7 +235,7 @@ export default function App(){
     </div>
 
     {/* Right Sidebar (Video + Log) */}
-    <div style={{ flex: "0 0 35%", display: "flex", flexDirection: "column", alignItems: "flex-end", minHeight: 0, overflow: "hidden" }}>
+    <div className="right-column">
       <VideoWindow />
       <LogPanel />
     </div>
