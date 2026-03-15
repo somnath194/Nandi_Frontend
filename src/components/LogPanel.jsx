@@ -1,70 +1,123 @@
 import React, { useEffect, useRef, useState } from "react"
 
+const LOG_SERVERS = [
+  "wss://api.shuun.site/ws/logs",
+  "wss://api2.shuun.site/ws/logs"
+]
+
+const HEALTH_URLS = [
+  "https://api.shuun.site/health",
+  "https://api2.shuun.site/health"
+]
+
+async function pickHealthyServer() {
+  for (let i = 0; i < HEALTH_URLS.length; i++) {
+    try {
+      const res = await fetch(HEALTH_URLS[i], { signal: AbortSignal.timeout(3000) })
+      if (res.ok) {
+        console.log(`✅ Log health OK: ${HEALTH_URLS[i]}`)
+        return i
+      }
+    } catch {
+      console.warn(`⚠️ Log health failed: ${HEALTH_URLS[i]}`)
+    }
+  }
+  return 0
+}
+
 const LogPanel = () => {
   const [logs, setLogs] = useState([])
   const [isConnected, setIsConnected] = useState(false)
+  const [activeServer, setActiveServer] = useState(null)  // shows which server is live
   const logsEndRef = useRef(null)
   const wsRef = useRef(null)
 
   useEffect(() => {
-    const LOG_SERVER_URL = "wss://api.shuun.site/ws/logs" // Change if deployed remotely
-    // const LOG_SERVER_URL = "ws://127.0.0.1:8001/ws/logs" // Local fallback
+    let cancelled = false   // prevent state updates after unmount
 
-    console.log(`📡 Connecting to log server at ${LOG_SERVER_URL}...`)
+    async function connect() {
+      const serverIndex = await pickHealthyServer()
+      if (cancelled) return
 
-    try {
-      const ws = new WebSocket(LOG_SERVER_URL)
-      wsRef.current = ws
+      const url = LOG_SERVERS[serverIndex]
+      console.log(`📡 Connecting to log server: ${url}`)
 
-      ws.onopen = () => {
-        setIsConnected(true)
-        console.log("✅ Log server connected!")
-      }
+      try {
+        if (wsRef.current) {
+          try { wsRef.current.close() } catch {}
+        }
 
-      ws.onmessage = (event) => {
-        const message = event.data
-        const timestamp = new Date().toLocaleTimeString()
-        setLogs((prevLogs) => [...prevLogs, { id: Date.now(), message, timestamp }])
-      }
+        const ws = new WebSocket(url)
+        wsRef.current = ws
 
-      ws.onerror = (err) => {
-        console.error("❌ Log server error:", err)
+        ws.onopen = () => {
+          if (cancelled) return
+          setIsConnected(true)
+          setActiveServer(serverIndex === 0 ? "Primary" : "Backup")
+          console.log(`✅ Log server connected: ${url}`)
+        }
+
+        ws.onmessage = (event) => {
+          if (cancelled) return
+          const message = event.data
+          const timestamp = new Date().toLocaleTimeString()
+          setLogs(prev => [...prev, { id: Date.now(), message, timestamp }])
+        }
+
+        ws.onerror = (err) => {
+          console.error("❌ Log server error:", err)
+          setIsConnected(false)
+        }
+
+        ws.onclose = () => {
+          if (cancelled) return
+          console.log(`⚠️ Log server closed: ${url}`)
+          setIsConnected(false)
+          setActiveServer(null)
+
+          // Auto-retry after 4s — will re-run health check and pick best server
+          setTimeout(() => { if (!cancelled) connect() }, 4000)
+        }
+
+      } catch (err) {
+        console.error("🚫 Could not connect to log server:", err)
         setIsConnected(false)
+        setTimeout(() => { if (!cancelled) connect() }, 4000)
       }
-
-      ws.onclose = () => {
-        console.log("⚠️ Log server connection closed")
-        setIsConnected(false)
-      }
-    } catch (err) {
-      console.error("🚫 Could not connect to log server:", err)
-      setIsConnected(false)
     }
 
+    connect()
+
     return () => {
+      cancelled = true
       if (wsRef.current) {
-        wsRef.current.close()
+        try { wsRef.current.close() } catch {}
       }
     }
   }, [])
 
-  // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
-    // Don't force-scroll logs on small screens — keep mobile focus on chat
-    const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 900px)').matches
+    const isMobile = typeof window !== "undefined" &&
+      window.matchMedia?.("(max-width: 900px)").matches
     if (isMobile) return
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [logs])
 
-  const clearLogs = () => {
-    setLogs([])
-  }
+  const clearLogs = () => setLogs([])
 
   return (
     <div className="action-log">
       <div className="action-log__header">
         <span>
-          📡 Logs <span style={{ color: isConnected ? '#10b981' : '#ef4444', marginLeft: 6 }}>{isConnected ? '● Connected' : '● Disconnected'}</span>
+          📡 Logs{" "}
+          <span style={{ color: isConnected ? "#10b981" : "#ef4444", marginLeft: 6 }}>
+            {isConnected ? `● Connected` : "● Disconnected"}
+          </span>
+          {activeServer && (
+            <span style={{ color: "#6b7280", fontSize: "0.7rem", marginLeft: 6 }}>
+              ({activeServer})
+            </span>
+          )}
         </span>
         <button className="action-log__clear" onClick={clearLogs}>Clear</button>
       </div>
@@ -75,7 +128,8 @@ const LogPanel = () => {
         ) : (
           logs.map((log) => (
             <div key={log.id} className="action-log__line">
-              <span className="action-log__ts">[{log.timestamp}]</span> <span className="action-log__msg">{log.message}</span>
+              <span className="action-log__ts">[{log.timestamp}]</span>{" "}
+              <span className="action-log__msg">{log.message}</span>
             </div>
           ))
         )}
