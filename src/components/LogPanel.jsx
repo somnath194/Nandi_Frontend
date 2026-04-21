@@ -25,6 +25,10 @@ async function pickHealthyServer() {
   return 0
 }
 
+function getUserToken() {
+  return localStorage.getItem("user_token")
+}
+
 const LogPanel = () => {
   const [logs, setLogs] = useState([])
   const [isConnected, setIsConnected] = useState(false)
@@ -52,16 +56,51 @@ const LogPanel = () => {
 
         ws.onopen = () => {
           if (cancelled) return
-          setIsConnected(true)
-          setActiveServer(serverIndex === 0 ? "Primary" : "Backup")
+
           console.log(`✅ Log server connected: ${url}`)
+
+          const token = getUserToken()
+
+          if (!token) {
+            console.warn("⚠️ No JWT token found")
+            return
+          }
+
+          // 🔐 STEP 1: Send auth
+          ws.send(JSON.stringify({
+            type: "auth",
+            token: token
+          }))
+
+          console.log("🔐 Sent JWT for logs authentication")
         }
 
         ws.onmessage = (event) => {
           if (cancelled) return
-          const message = event.data
+
+          const data = JSON.parse(event.data)
+
+          // 🔐 Step 2: Auth success
+          if (data.status === "authenticated") {
+            setIsConnected(true)
+            setActiveServer(serverIndex === 0 ? "Primary" : "Backup")
+            console.log("✅ Logs authenticated")
+            return
+          }
+
+          // 🔒 Token expired / invalid
+          if (data.error === "Invalid or expired token" || data.error === "Not authenticated") {
+            console.warn("🔒 Log token issue — cannot auto refresh here")
+            return
+          }
+
+          // 📩 Normal log message
           const timestamp = new Date().toLocaleTimeString()
-          setLogs(prev => [...prev, { id: Date.now(), message, timestamp }])
+          setLogs(prev => [...prev, {
+            id: Date.now(),
+            message: data.log,   // logs are plain text usually
+            timestamp
+          }])
         }
 
         ws.onerror = (err) => {
