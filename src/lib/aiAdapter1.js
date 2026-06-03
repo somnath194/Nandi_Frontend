@@ -1,13 +1,15 @@
 // ai adapter with automatic fallback between primary and backup servers
 const SERVERS = [
-  "ws://localhost:8001/ws/chat",
-  "wss://api2.shuun.site/ws/chat"
+  "wss://api.shuun.site/ws/chat",
+  "ws://localhost:8001/ws/chat"
 ]
 
 const HEALTH_URLS = [
-  "http://localhost:8001/health",
-  "https://api2.shuun.site/health"
+  "https://api.shuun.site/health",
+  "http://localhost:8001/health"
 ]
+
+const CLIENT_ID = "react_web"
 
 let ws = null
 let isConnected = false
@@ -131,7 +133,7 @@ export async function chat(history, attachments, onMessage) {
       const last = history.filter(m => m.role === "user").slice(-1)[0]
       const text = (last?.text || "").trim()
 
-      const payload = { query: text, session_id: "default" }
+      const payload = { query: text, client_id: CLIENT_ID, attachments: [] }
       requestResolvers.push(resolve)
 
       // If already connected and open — just send

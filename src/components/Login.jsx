@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 
-const BACKEND_URL = "http://localhost:8001/auth/google-login"
+const BACKEND_URL = "http://api.shuun.site/auth/google-login"
 
 export default function Login({ onLogin }) {
 
