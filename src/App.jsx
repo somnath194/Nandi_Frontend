@@ -8,6 +8,7 @@ import LogPanel from './components/LogPanel.jsx'   // 👈 log panel import
 import { speak, listVoices, supportsRecognition, startRecognition, stopRecognition } from './lib/speech.js'
 import { chat as callAI } from './lib/aiAdapter1.js'
 import { uuid } from './lib/utils.js'
+import Login from "./components/Login.jsx"
 
 
 const initialBotMsg = {
@@ -18,6 +19,9 @@ const initialBotMsg = {
 }
 
 export default function App(){
+  const [isAuthenticated, setIsAuthenticated] = useState(
+  !!localStorage.getItem("user_token")
+  )
   const [messages, setMessages] = useState(() => {
     const saved = localStorage.getItem('chat.history')
     return saved ? JSON.parse(saved) : [initialBotMsg]
@@ -203,6 +207,10 @@ export default function App(){
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+ if (!isAuthenticated) {
+ return <Login onLogin={() => setIsAuthenticated(true)} />
+ }
 
  return (
   <div className="app-wrap">

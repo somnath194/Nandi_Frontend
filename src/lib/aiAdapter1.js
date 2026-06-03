@@ -1,13 +1,15 @@
 // ai adapter with automatic fallback between primary and backup servers
 const SERVERS = [
   "wss://api.shuun.site/ws/chat",
-  "wss://api2.shuun.site/ws/chat"
+  "ws://localhost:8001/ws/chat"
 ]
 
 const HEALTH_URLS = [
   "https://api.shuun.site/health",
-  "https://api2.shuun.site/health"
+  "http://localhost:8001/health"
 ]
+
+const CLIENT_ID = "react_web"
 
 let ws = null
 let isConnected = false
@@ -32,6 +34,10 @@ async function pickHealthyServer() {
   return 0   // fallback to primary even if both fail; WS error will surface it
 }
 
+function getUserToken() {
+  return localStorage.getItem("user_token")
+}
+
 // ── Connect to a specific server index ───────────────────────────────────────
 function connectWS(serverIndex, onOpen) {
   if (ws) {
@@ -45,26 +51,67 @@ function connectWS(serverIndex, onOpen) {
   ws = new WebSocket(url)
 
   ws.onopen = () => {
-    isConnected = true
-    activeServerIndex = serverIndex
-    console.log(`✅ WebSocket connected: ${url}`)
-    for (const item of pendingQueue) ws.send(JSON.stringify(item))
+  isConnected = true
+  activeServerIndex = serverIndex
+  console.log(`✅ WebSocket connected: ${url}`)
+
+  // 🔐 STEP 1: Send JWT FIRST
+  const token = getUserToken()
+
+  if (token) {
+    ws.send(JSON.stringify({
+      type: "auth",
+      token: token
+    }))
+    console.log("🔐 JWT sent for authentication")
+  } else {
+    console.warn("⚠️ No user token found")
+  }
+
+  // ⏳ STEP 2: Delay sending messages (IMPORTANT)
+  setTimeout(() => {
+    for (const item of pendingQueue) {
+      ws.send(JSON.stringify(item))
+    }
     pendingQueue = []
-    if (onOpen) onOpen()
+  }, 100)
+
+  if (onOpen) onOpen()
   }
 
   ws.onmessage = (event) => {
-    console.log("📩 Raw WS message:", event.data)
-    const data = JSON.parse(event.data)
-    const responseText = data.response || data.conversation_output
-    const normalizedData = { ...data, response_text: responseText }
+  console.log("📩 Raw WS message:", event.data)
 
-    if (globalOnMessage) globalOnMessage(normalizedData)
+  const data = JSON.parse(event.data)
 
-    if (responseText && requestResolvers.length > 0) {
-      const resolver = requestResolvers.shift()
-      resolver(responseText)
-    }
+  // 🔐 Auth success
+  if (data.status === "authenticated") {
+    console.log("✅ WebSocket authenticated")
+    return
+  }
+
+  // 🔒 Token expired → re-auth
+  if (data.error === "Invalid or expired token" || data.error === "Not authenticated") {
+    console.warn("🔒 Token issue, re-authenticating...")
+
+    const token = getUserToken()
+
+    ws.send(JSON.stringify({
+      type: "auth",
+      token: token
+    }))
+    return
+  }
+
+  const responseText = data.response || data.conversation_output
+  const normalizedData = { ...data, response_text: responseText }
+
+  if (globalOnMessage) globalOnMessage(normalizedData)
+
+  if (responseText && requestResolvers.length > 0) {
+    const resolver = requestResolvers.shift()
+    resolver(responseText)
+  }
   }
 
   ws.onerror = (err) => {
@@ -86,7 +133,7 @@ export async function chat(history, attachments, onMessage) {
       const last = history.filter(m => m.role === "user").slice(-1)[0]
       const text = (last?.text || "").trim()
 
-      const payload = { query: text, session_id: "default" }
+      const payload = { query: text, client_id: CLIENT_ID, attachments: [] }
       requestResolvers.push(resolve)
 
       // If already connected and open — just send
