@@ -1,81 +1,174 @@
-import React, { useEffect, useRef, useState } from 'react'
+/**
+ * Composer.jsx
+ *
+ * Input bar with:
+ *   - Text area (auto-growing, Enter to send, Shift+Enter for newline)
+ *   - Attach button → triggers Attachment.jsx file picker
+ *   - Attachment chip strip (via Attachment component)
+ *   - Drag & drop onto entire composer
+ *   - Send button (disabled while any file is still uploading)
+ */
 
-export default function Composer({ onSend, inputRef }){
-  const [value, setValue] = useState('')
-  const [files, setFiles] = useState([])
-  const dzRef = useRef(null)
+import React, { useRef, useState, useCallback } from "react"
+import Attachment from "./Attachment.jsx"
 
-  function handleFiles(selected){
-    const arr = Array.from(selected || [])
-    if(arr.length === 0) return
-    const proms = arr.map(file => {
-      return new Promise(resolve => {
-        if(file.type.startsWith('image/')){
-          const fr = new FileReader()
-          fr.onload = () => resolve({ kind: 'image', name: file.name, size: file.size, type: file.type, preview: fr.result })
-          fr.readAsDataURL(file)
-        }else{
-          resolve({ kind: 'file', name: file.name, size: file.size, type: file.type })
-        }
-      })
-    })
-    Promise.all(proms).then(prepared => setFiles(prev => [...prev, ...prepared]))
-  }
+export default function Composer({ onSend, inputRef }) {
+  const [text, setText]                         = useState("")
+  const [readyAttachments, setReadyAttachments] = useState([])
+  const [isUploading, setIsUploading]           = useState(false)
+  const attRef                                  = useRef(null)
 
-  useEffect(() => {
-    const dz = dzRef.current
-    const onDrop = (e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); dz.classList.remove('drag') }
-    const onDragOver = (e) => { e.preventDefault(); dz.classList.add('drag') }
-    const onDragLeave = () => dz.classList.remove('drag')
-    dz.addEventListener('drop', onDrop)
-    dz.addEventListener('dragover', onDragOver)
-    dz.addEventListener('dragleave', onDragLeave)
-    return () => {
-      dz.removeEventListener('drop', onDrop)
-      dz.removeEventListener('dragover', onDragOver)
-      dz.removeEventListener('dragleave', onDragLeave)
-    }
+  // ── Attachment state callback ─────────────────────────────────────────────
+  const handleAttachmentChange = useCallback((ready, uploading) => {
+    setReadyAttachments(ready)
+    setIsUploading(uploading)
   }, [])
 
-  function submit(){
-    onSend(value.trim(), files)
-    setValue('')
-    setFiles([])
-    inputRef?.current?.focus()
-  }
+  // ── Send ──────────────────────────────────────────────────────────────────
+  const handleSend = useCallback(() => {
+    const trimmed = text.trim()
 
-  function onKeyDown(e){
-    if(e.key === 'Enter' && !e.shiftKey){
-      e.preventDefault()
-      submit()
-    }
-  }
+    // Block while uploads are in progress
+    if (isUploading) return
+
+    // Need at least text OR at least one attached file
+    if (!trimmed && readyAttachments.length === 0) return
+
+    onSend(trimmed, readyAttachments)
+
+    // Reset
+    setText("")
+    attRef.current?.clear()
+  }, [text, readyAttachments, isUploading, onSend])
+
+  // ── Keyboard: Enter = send, Shift+Enter = newline ─────────────────────────
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+        handleSend()
+      }
+    },
+    [handleSend]
+  )
+
+  // ── Auto-grow textarea ────────────────────────────────────────────────────
+  const handleChange = useCallback((e) => {
+    setText(e.target.value)
+    // Shrink to auto first, then expand to fit content (max 180 px)
+    e.target.style.height = "auto"
+    e.target.style.height = Math.min(e.target.scrollHeight, 180) + "px"
+  }, [])
+
+  const canSend = !isUploading && (text.trim() || readyAttachments.length > 0)
 
   return (
     <div className="composer">
-      <div className="input-wrap" ref={dzRef} title="Drop files here">
-        <label className="icon-btn" style={{ gap: 6, cursor: 'pointer' }}>
-          <input type="file" multiple hidden onChange={e => handleFiles(e.target.files)} />
-          <span>📎</span> Attach
-        </label>
+      {/*
+        Attachment handles:
+          - drag & drop zone (entire component acts as a drop target)
+          - file input (hidden)
+          - chip strip display
+          - upload logic
+      */}
+      <Attachment ref={attRef} onChange={handleAttachmentChange} />
+
+      {/* ── Bottom input bar ── */}
+      <div className="composer__bar">
+
+        {/* Attach button — delegates click to Attachment's hidden input */}
+        <button
+          className="composer__attach-btn"
+          type="button"
+          title="Attach files (or drag & drop)"
+          onClick={() => attRef.current?.triggerSelect()}
+        >
+          <PaperclipIcon />
+          <span>Attach</span>
+        </button>
+
+        {/* Text area */}
         <textarea
           ref={inputRef}
-          className="input"
-          rows={1}
+          className="composer__textarea"
           placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
-          value={value}
-          onInput={e => {
-            setValue(e.target.value)
-            e.target.style.height = 'auto'
-            e.target.style.height = e.target.scrollHeight + 'px'
-          }}
-          onKeyDown={onKeyDown}
+          value={text}
+          rows={1}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
         />
-        <div className="dropzone">Drop files</div>
+
+        {/* Drop-files hint (clickable shortcut, hidden on mobile via CSS) */}
+        <span
+          className="composer__drop-hint"
+          onClick={() => attRef.current?.triggerSelect()}
+          title="Click to attach or drag files anywhere"
+        >
+          Drop files
+        </span>
+
+        {/* Send button */}
+        <button
+          className={`composer__send-btn${canSend ? "" : " composer__send-btn--disabled"}`}
+          type="button"
+          disabled={!canSend}
+          onClick={handleSend}
+          title={
+            isUploading
+              ? "Waiting for uploads to finish…"
+              : canSend
+              ? "Send message"
+              : "Type a message or attach a file"
+          }
+        >
+          {isUploading ? (
+            <>
+              <span className="composer__spinner" />
+              <span>Uploading…</span>
+            </>
+          ) : (
+            <>
+              Send
+              <ArrowIcon />
+            </>
+          )}
+        </button>
       </div>
-      <button className="send-btn" onClick={submit} title="Send">
-        Send ➤
-      </button>
     </div>
+  )
+}
+
+// ─── Inline SVG icons (no icon library dep) ───────────────────────────────────
+
+function PaperclipIcon() {
+  return (
+    <svg
+      width="16" height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  )
+}
+
+function ArrowIcon() {
+  return (
+    <svg
+      width="13" height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
   )
 }

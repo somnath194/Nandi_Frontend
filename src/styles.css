@@ -492,3 +492,307 @@ textarea.input{
   .settings{ padding: 10px; }
   .action-log{ padding: 8px; }
 }
+
+/* ================================================================
+   ATTACHMENT + COMPOSER — paste this at the END of styles.css,
+   replacing the previous attachment section entirely.
+   ================================================================ */
+
+/* ── ✅ FIX: Override the original grid-based .composer ──────────
+   Original: display:grid; grid-template-columns: 1fr auto
+   Problem:  Attachment (chips) filled the 1fr column on the LEFT,
+             and composer__bar (Attach btn + textarea + Send) was
+             squashed into the auto column on the RIGHT.
+   Fix:      Make composer a flex column so chips sit ABOVE the
+             input bar, spanning full width (ChatGPT-style).
+   ──────────────────────────────────────────────────────────────── */
+.composer {
+  display: flex !important;        /* override the grid */
+  flex-direction: column;          /* chips on top, input bar below */
+  background: color-mix(in oklab, var(--panel) 92%, black);
+  border: 1px solid rgba(148, 163, 184, .15);
+  border-radius: 16px;
+  padding: 0;                      /* children handle their own padding */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  gap: 0;
+  overflow: hidden;
+}
+
+/* ── Attachment root (drag-drop wrapper) ─────────────────────── */
+.att-root {
+  position: relative;
+}
+
+.att-root--dragging {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+/* ── Drag overlay ────────────────────────────────────────────── */
+.att-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(34, 211, 238, 0.08);
+  border-radius: 8px;
+  font-size: 1rem;
+  color: var(--accent);
+  pointer-events: none;
+  font-weight: 500;
+}
+
+/* ── Chip strip (appears above input bar when files are attached) */
+.att-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
+}
+
+/* ── Individual chip ─────────────────────────────────────────── */
+.att-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 230px;
+  background: color-mix(in oklab, var(--panel-2) 80%, black);
+  border: 1px solid rgba(148, 163, 184, .15);
+  border-radius: 10px;
+  padding: 6px 8px 6px 6px;
+  transition: border-color 0.2s;
+}
+
+.att-chip--uploading { border-color: rgba(34, 211, 238, 0.35); }
+.att-chip--done      { border-color: rgba(16, 185, 129, 0.35); }
+.att-chip--error     { border-color: rgba(239, 68, 68, 0.4);
+                        background: rgba(239,68,68,.05); }
+
+/* Thumbnail / icon box */
+.att-chip__thumb {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 1.2rem;
+}
+
+.att-chip__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Uploading spinner overlay on thumb */
+.att-chip__spinner-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Chip body */
+.att-chip__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.att-chip__name {
+  font-size: 0.78rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Progress bar */
+.att-chip__progress-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.att-chip__progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.35s ease;
+}
+
+/* Status labels */
+.att-chip__status        { font-size: 0.7rem; }
+.att-chip__status--ok    { color: var(--success); }
+.att-chip__status--err   { color: var(--danger); }
+
+/* Remove button */
+.att-chip__rm {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.att-chip__rm:hover:not(:disabled) {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.att-chip__rm:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ── Input bar ─────────────────────────────────────────────────── */
+.composer__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+/* ── Attach button (far left) ──────────────────────────────────── */
+.composer__attach-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid rgba(148, 163, 184, .15);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color .15s, background .15s, border-color .15s;
+}
+
+.composer__attach-btn:hover {
+  color: var(--accent);
+  background: rgba(34, 211, 238, .08);
+  border-color: rgba(34, 211, 238, .3);
+}
+
+/* ── Textarea (fills remaining space) ─────────────────────────── */
+.composer__textarea {
+  flex: 1;                       /* fills all remaining width */
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: inherit;
+  line-height: 1.55;
+  resize: none;
+  min-height: 24px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 3px 0;
+}
+
+.composer__textarea::placeholder { color: #3d444d; }
+
+/* ── Drop-files hint ──────────────────────────────────────────── */
+.composer__drop-hint {
+  color: #3d444d;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  transition: color .15s;
+}
+
+.composer__drop-hint:hover { color: var(--muted); }
+
+@media (max-width: 560px) {
+  .composer__drop-hint { display: none; }
+}
+
+/* ── Send button ──────────────────────────────────────────────── */
+.composer__send-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, var(--accent-2), #0284c7);
+  color: #001c2c;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform .12s ease, opacity .15s;
+  white-space: nowrap;
+}
+
+.composer__send-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.composer__send-btn:active               { transform: translateY(0); }
+.composer__send-btn:disabled             { opacity: 0.35; cursor: default; }
+
+/* ── Spinners ──────────────────────────────────────────────────── */
+.composer__spinner,
+.att-chip__spinner {
+  display: inline-block;
+  border-radius: 50%;
+  animation: nandi-spin 0.7s linear infinite;
+}
+
+.composer__spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(0, 28, 44, 0.3);
+  border-top-color: #001c2c;
+}
+
+.att-chip__spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+}
+
+@keyframes nandi-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive: restore stacking on mobile ───────────────────── */
+@media (max-width: 900px) {
+  .composer {
+    position: sticky;
+    bottom: 8px;
+    z-index: 40;
+    flex-direction: column !important;   /* keep column on mobile too */
+  }
+  .composer__bar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .composer__send-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

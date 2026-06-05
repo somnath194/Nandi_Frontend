@@ -6,7 +6,7 @@ import SettingsPanel from './components/SettingsPanel.jsx'
 import VideoWindow from './components/VideoWindow.jsx'   // 👈 import added
 import LogPanel from './components/LogPanel.jsx'   // 👈 log panel import
 import { speak, listVoices, supportsRecognition, startRecognition, stopRecognition } from './lib/speech.js'
-import { chat as callAI } from './lib/aiAdapter1.js'
+import { chat as callAI } from './lib/aiAdapter.js'
 import { uuid } from './lib/utils.js'
 import Login from "./components/Login.jsx"
 
