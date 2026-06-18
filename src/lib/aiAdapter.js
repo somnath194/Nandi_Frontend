@@ -12,7 +12,7 @@ const HEALTH_URLS = [
 // ✅ Base URLs matching each server (used for REST calls like /api/upload)
 const BASE_URLS = [
   "https://api.shuun.site",
-  "http://localhost:8001",
+  "http://localhost:8000",
 ]
 
 const CLIENT_ID = "react_web"
