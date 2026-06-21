@@ -1,181 +1,134 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from 'react'
 
 const LOG_SERVERS = [
-  "wss://api.shuun.site/ws/logs",
-  "ws://localhost:8001/ws/logs"
+  'wss://api.shuun.site/ws/logs',
+  'ws://localhost:8001/ws/logs',
 ]
 
 const HEALTH_URLS = [
-  "https://api.shuun.site/health",
-  "http://localhost:8001/health"
+  'https://api.shuun.site/health',
+  'http://localhost:8001/health',
 ]
 
 async function pickHealthyServer() {
   for (let i = 0; i < HEALTH_URLS.length; i++) {
     try {
       const res = await fetch(HEALTH_URLS[i], { signal: AbortSignal.timeout(3000) })
-      if (res.ok) {
-        console.log(`✅ Log health OK: ${HEALTH_URLS[i]}`)
-        return i
-      }
-    } catch {
-      console.warn(`⚠️ Log health failed: ${HEALTH_URLS[i]}`)
-    }
+      if (res.ok) return i
+    } catch { /* skip */ }
   }
   return 0
 }
 
-function getUserToken() {
-  return localStorage.getItem("user_token")
+function getToken() {
+  return localStorage.getItem('user_token')
 }
 
-const LogPanel = () => {
+function classifyLog(msg) {
+  if (!msg) return 'info'
+  const lower = msg.toLowerCase()
+  if (lower.includes('error') || lower.includes('failed') || lower.includes('❌')) return 'error'
+  if (lower.includes('warn') || lower.includes('⚠️')) return 'warn'
+  if (lower.includes('route') || lower.includes('→') || lower.includes('selected')) return 'step'
+  return 'info'
+}
+
+export default function LogPanel() {
   const [logs, setLogs] = useState([])
-  const [isConnected, setIsConnected] = useState(false)
-  const [activeServer, setActiveServer] = useState(null)  // shows which server is live
-  const logsEndRef = useRef(null)
+  const [connected, setConnected] = useState(false)
+  const endRef = useRef(null)
   const wsRef = useRef(null)
 
   useEffect(() => {
-    let cancelled = false   // prevent state updates after unmount
+    let cancelled = false
 
     async function connect() {
-      const serverIndex = await pickHealthyServer()
+      const idx = await pickHealthyServer()
       if (cancelled) return
 
-      const url = LOG_SERVERS[serverIndex]
-      console.log(`📡 Connecting to log server: ${url}`)
+      const url = LOG_SERVERS[idx]
 
-      try {
-        if (wsRef.current) {
-          try { wsRef.current.close() } catch {}
+      if (wsRef.current) {
+        try { wsRef.current.close() } catch {}
+      }
+
+      const ws = new WebSocket(url)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        if (cancelled) return
+        const token = getToken()
+        if (token) ws.send(JSON.stringify({ type: 'auth', token }))
+      }
+
+      ws.onmessage = (event) => {
+        if (cancelled) return
+        let data
+        try { data = JSON.parse(event.data) } catch { return }
+
+        if (data.status === 'authenticated') {
+          setConnected(true)
+          return
         }
 
-        const ws = new WebSocket(url)
-        wsRef.current = ws
+        if (data.error) return
 
-        ws.onopen = () => {
-          if (cancelled) return
+        const msg = data.log || data.message || JSON.stringify(data)
+        const ts = new Date().toLocaleTimeString('en-GB', { hour12: false })
 
-          console.log(`✅ Log server connected: ${url}`)
+        setLogs(prev => [...prev.slice(-200), {   // keep last 200
+          id: Date.now() + Math.random(),
+          msg,
+          ts,
+          type: classifyLog(msg),
+        }])
+      }
 
-          const token = getUserToken()
-
-          if (!token) {
-            console.warn("⚠️ No JWT token found")
-            return
-          }
-
-          // 🔐 STEP 1: Send auth
-          ws.send(JSON.stringify({
-            type: "auth",
-            token: token
-          }))
-
-          console.log("🔐 Sent JWT for logs authentication")
-        }
-
-        ws.onmessage = (event) => {
-          if (cancelled) return
-
-          const data = JSON.parse(event.data)
-
-          // 🔐 Step 2: Auth success
-          if (data.status === "authenticated") {
-            setIsConnected(true)
-            setActiveServer(serverIndex === 0 ? "Primary" : "Backup")
-            console.log("✅ Logs authenticated")
-            return
-          }
-
-          // 🔒 Token expired / invalid
-          if (data.error === "Invalid or expired token" || data.error === "Not authenticated") {
-            console.warn("🔒 Log token issue — cannot auto refresh here")
-            return
-          }
-
-          // 📩 Normal log message
-          const timestamp = new Date().toLocaleTimeString()
-          setLogs(prev => [...prev, {
-            id: Date.now(),
-            message: data.log,   // logs are plain text usually
-            timestamp
-          }])
-        }
-
-        ws.onerror = (err) => {
-          console.error("❌ Log server error:", err)
-          setIsConnected(false)
-        }
-
-        ws.onclose = () => {
-          if (cancelled) return
-          console.log(`⚠️ Log server closed: ${url}`)
-          setIsConnected(false)
-          setActiveServer(null)
-
-          // Auto-retry after 4s — will re-run health check and pick best server
-          setTimeout(() => { if (!cancelled) connect() }, 4000)
-        }
-
-      } catch (err) {
-        console.error("🚫 Could not connect to log server:", err)
-        setIsConnected(false)
+      ws.onerror = () => setConnected(false)
+      ws.onclose = () => {
+        if (cancelled) return
+        setConnected(false)
         setTimeout(() => { if (!cancelled) connect() }, 4000)
       }
     }
 
     connect()
-
     return () => {
       cancelled = true
-      if (wsRef.current) {
-        try { wsRef.current.close() } catch {}
-      }
+      if (wsRef.current) try { wsRef.current.close() } catch {}
     }
   }, [])
 
+  // Auto-scroll (desktop only)
   useEffect(() => {
-    const isMobile = typeof window !== "undefined" &&
-      window.matchMedia?.("(max-width: 900px)").matches
-    if (isMobile) return
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (window.innerWidth > 900) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [logs])
 
-  const clearLogs = () => setLogs([])
-
   return (
-    <div className="action-log">
-      <div className="action-log__header">
-        <span>
-          📡 Logs{" "}
-          <span style={{ color: isConnected ? "#10b981" : "#ef4444", marginLeft: 6 }}>
-            {isConnected ? `● Connected` : "● Disconnected"}
-          </span>
-          {activeServer && (
-            <span style={{ color: "#6b7280", fontSize: "0.7rem", marginLeft: 6 }}>
-              ({activeServer})
-            </span>
-          )}
+    <>
+      <div className="log-sidebar__header">
+        <span className="log-sidebar__title">
+          <span className={`log-sidebar__indicator${connected ? '' : ' log-sidebar__indicator--off'}`} />
+          Activity
         </span>
-        <button className="action-log__clear" onClick={clearLogs}>Clear</button>
+        <button className="log-sidebar__clear" onClick={() => setLogs([])}>Clear</button>
       </div>
 
-      <div className="action-log__body">
+      <div className="log-sidebar__body">
         {logs.length === 0 ? (
-          <div className="action-log__empty">Waiting for logs...</div>
+          <div className="log-sidebar__empty">Waiting for activity…</div>
         ) : (
-          logs.map((log) => (
-            <div key={log.id} className="action-log__line">
-              <span className="action-log__ts">[{log.timestamp}]</span>{" "}
-              <span className="action-log__msg">{log.message}</span>
+          logs.map(log => (
+            <div key={log.id} className={`log-entry log-entry--${log.type}`}>
+              <span className="log-entry__ts">{log.ts}</span>
+              <span className="log-entry__msg">{log.msg}</span>
             </div>
           ))
         )}
-        <div ref={logsEndRef} />
+        <div ref={endRef} />
       </div>
-    </div>
+    </>
   )
 }
-
-export default LogPanel
