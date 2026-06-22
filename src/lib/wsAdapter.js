@@ -14,7 +14,7 @@ const HEALTH_URLS = [
 
 const BASE_URLS = [
   'https://api.shuun.site',
-  'http://localhost:8000',
+  'http://localhost:8001',
 ]
 
 const CLIENT_ID = 'nandi_web'
