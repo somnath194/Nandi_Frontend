@@ -1,24 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { openWithFallback } from '../../nandi-connection-fixes/src/lib/wsFallback.js'
 
-const LOG_SERVERS = [
+// Domain first, localhost fallback. Probed by opening the WS (no /health fetch),
+// so it works even without CORS and auto-skips ws://localhost on HTTPS deploys.
+const LOG_URLS = [
   'wss://api.shuun.site/ws/logs',
   'ws://localhost:8000/ws/logs',
 ]
-
-const HEALTH_URLS = [
-  'https://api.shuun.site/health',
-  'http://localhost:8000/health',
-]
-
-async function pickHealthyServer() {
-  for (let i = 0; i < HEALTH_URLS.length; i++) {
-    try {
-      const res = await fetch(HEALTH_URLS[i], { signal: AbortSignal.timeout(3000) })
-      if (res.ok) return i
-    } catch { /* skip */ }
-  }
-  return 0
-}
 
 function getToken() {
   return localStorage.getItem('user_token')
@@ -38,31 +26,37 @@ export default function LogPanel() {
   const [connected, setConnected] = useState(false)
   const endRef = useRef(null)
   const wsRef = useRef(null)
+  const preferIdxRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
+    let reconnectTimer = null
 
     async function connect() {
-      const idx = await pickHealthyServer()
       if (cancelled) return
 
-      const url = LOG_SERVERS[idx]
-
-      if (wsRef.current) {
-        try { wsRef.current.close() } catch {}
+      let resolved
+      try {
+        resolved = await openWithFallback({
+          urls: LOG_URLS,
+          startIndex: preferIdxRef.current,
+          timeout: 3000,
+        })
+      } catch {
+        if (cancelled) return
+        setConnected(false)
+        reconnectTimer = setTimeout(connect, 4000)
+        return
       }
 
-      const ws = new WebSocket(url)
-      wsRef.current = ws
+      if (cancelled) { try { resolved.socket.close() } catch {}; return }
 
-      ws.onopen = () => {
-        if (cancelled) return
-        const token = getToken()
-        if (token) ws.send(JSON.stringify({ type: 'auth', token }))
-      }
+      preferIdxRef.current = resolved.index
+      const socket = resolved.socket
+      wsRef.current = socket
 
-      ws.onmessage = (event) => {
-        if (cancelled) return
+      socket.onmessage = (event) => {
+        if (cancelled || wsRef.current !== socket) return
         let data
         try { data = JSON.parse(event.data) } catch { return }
 
@@ -70,32 +64,34 @@ export default function LogPanel() {
           setConnected(true)
           return
         }
-
         if (data.error) return
 
         const msg = data.log || data.message || JSON.stringify(data)
         const ts = new Date().toLocaleTimeString('en-GB', { hour12: false })
-
-        setLogs(prev => [...prev.slice(-200), {   // keep last 200
+        setLogs(prev => [...prev.slice(-200), {
           id: Date.now() + Math.random(),
-          msg,
-          ts,
-          type: classifyLog(msg),
+          msg, ts, type: classifyLog(msg),
         }])
       }
 
-      ws.onerror = () => setConnected(false)
-      ws.onclose = () => {
-        if (cancelled) return
+      socket.onerror = () => {}
+      socket.onclose = () => {
+        if (cancelled || wsRef.current !== socket) return
         setConnected(false)
-        setTimeout(() => { if (!cancelled) connect() }, 4000)
+        wsRef.current = null
+        reconnectTimer = setTimeout(connect, 4000)
       }
+
+      const token = getToken()
+      if (token) socket.send(JSON.stringify({ type: 'auth', token }))
+      else setConnected(true)   // no auth needed — mark live so the dot is green
     }
 
     connect()
     return () => {
       cancelled = true
-      if (wsRef.current) try { wsRef.current.close() } catch {}
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (wsRef.current) { try { wsRef.current.close() } catch {} }
     }
   }, [])
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import Login from './components/Login.jsx'
 import DeviceSetup from './components/DeviceSetup.jsx'
 import ChatView from './components/ChatView.jsx'
+import { onAuthFailure } from './lib/wsAdapter.js'
 
 function getDeviceId() {
   // Check cookie for device_id
@@ -27,6 +28,7 @@ export default function App() {
     if (token) setIsLoggedIn(true)
     if (savedDevice) setDeviceId(savedDevice)
     setLoading(false)
+    onAuthFailure(() => setIsLoggedIn(false))
   }, [])
 
   const handleLogin = useCallback(() => {

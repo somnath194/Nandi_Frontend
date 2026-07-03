@@ -33,9 +33,6 @@ let messageCallback = null
 let connectionCallback = null
 let connecting = false
 let reconnectTimer = null
-let authFailureCallback = null
-
-export function onAuthFailure(cb) { authFailureCallback = cb }
 
 function getToken() {
   return localStorage.getItem('user_token')
@@ -103,15 +100,7 @@ export async function ensureConnection() {
       }
 
       if (data.error === 'Invalid or expired token' || data.error === 'Not authenticated') {
-        // 'Not authenticated' can be a transient race (auth not processed yet) →
-        // re-send once. 'Invalid or expired token' means the JWT is genuinely bad;
-        // re-sending won't help, so clear it and bounce to the login screen.
-        if (data.error === 'Invalid or expired token') {
-          console.warn('[ws] token expired — clearing and requesting re-login')
-          localStorage.removeItem('user_token')
-          authFailureCallback?.()
-          return
-        }
+        console.warn('[ws] token issue, re-sending auth')
         const token = getToken()
         if (token) ws.send(JSON.stringify({ type: 'auth', token }))
         return
