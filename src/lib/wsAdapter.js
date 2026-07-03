@@ -4,17 +4,17 @@
 
 const SERVERS = [
   'wss://api.shuun.site/ws/chat',
-  'ws://localhost:8001/ws/chat',
+  'ws://localhost:8000/ws/chat',
 ]
 
 const HEALTH_URLS = [
   'https://api.shuun.site/health',
-  'http://localhost:8001/health',
+  'http://localhost:8000/health',
 ]
 
 const BASE_URLS = [
   'https://api.shuun.site',
-  'http://localhost:8001',
+  'http://localhost:8000',
 ]
 
 const CLIENT_ID = 'nandi_web'

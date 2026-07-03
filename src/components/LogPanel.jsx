@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const LOG_SERVERS = [
   'wss://api.shuun.site/ws/logs',
-  'ws://localhost:8001/ws/logs',
+  'ws://localhost:8000/ws/logs',
 ]
 
 const HEALTH_URLS = [
   'https://api.shuun.site/health',
-  'http://localhost:8001/health',
+  'http://localhost:8000/health',
 ]
 
 async function pickHealthyServer() {

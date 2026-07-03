@@ -12,7 +12,7 @@
 
 const VISION_CTRL_URLS = [
   'wss://api.shuun.site/ws/vision-control',
-  'ws://localhost:8001/ws/vision-control',
+  'ws://localhost:8000/ws/vision-control',
 ]
 
 let ws = null
