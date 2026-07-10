@@ -23,7 +23,7 @@ const ICE_SERVERS = [
 
 const SIGNAL_URLS = [
   'wss://vision.shuun.site/ws/signal',
-  'ws://localhost:8765/ws/signal',
+  'ws://localhost:8766/ws/signal',
 ]
 
 // If an explicit override is set, use ONLY that (handy for testing).
